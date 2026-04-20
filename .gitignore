@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# IDE / Editor
+.idea/
+.vscode/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# PHP / Composer
+/vendor/
+composer.phar
+
+# WHMCS runtime caches (safe to regenerate)
+templates_c/*
+!templates_c/.htaccess
+!templates_c/index.php
+
+# Temporary files
+*.tmp
+*.swp
