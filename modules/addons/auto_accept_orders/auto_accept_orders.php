@@ -17,7 +17,7 @@ function auto_accept_orders_config()
         'name' => 'Auto Accept Orders',
         'description' => 'Automatically accepts paid and free pending orders.',
         'version' => '1.0.0',
-        'author' => 'Cursor',
+        'author' => 'vercaa.com',
         'fields' => [
             'enabled' => [
                 'FriendlyName' => 'Enable',
