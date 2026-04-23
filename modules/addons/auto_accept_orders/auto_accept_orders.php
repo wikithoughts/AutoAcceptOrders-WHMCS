@@ -16,7 +16,7 @@ function auto_accept_orders_config()
     return [
         'name' => 'Auto Accept Orders',
         'description' => 'Automatically accepts paid and free pending orders.',
-        'version' => '1.0.0',
+        'version' => '1.1.0',
         'author' => 'vercaa.com',
         'fields' => [
             'enabled' => [
@@ -28,14 +28,18 @@ function auto_accept_orders_config()
                 'FriendlyName' => 'Admin Username',
                 'Type' => 'text',
                 'Size' => '30',
-                'Description' => 'Optional. If blank/invalid, fallback uses the first active Full Administrator.',
+                'Description' => 'Optional. If blank/invalid, the first active Full Administrator is used. A Full Administrator account is required.',
             ],
         ],
     ];
 }
 
 /**
- * Activate module and create logs table.
+ * Activate module: create logs table with unique dedup index.
+ *
+ * If the table already exists (preserved from a previous install), the unique
+ * index is added idempotently so existing installs upgrading via re-activation
+ * are also covered.
  *
  * @return array
  */
@@ -45,11 +49,21 @@ function auto_accept_orders_activate()
         if (!Capsule::schema()->hasTable('mod_autoaccept_logs')) {
             Capsule::schema()->create('mod_autoaccept_logs', function ($table) {
                 $table->increments('id');
-                $table->integer('order_id')->unsigned()->index();
+                $table->integer('order_id')->unsigned();
                 $table->string('trigger_hook', 50);
                 $table->text('status_response');
                 $table->dateTime('created_at');
+                $table->unique(['order_id', 'trigger_hook'], 'aao_order_trigger_unique');
             });
+        } else {
+            $existing = Capsule::select(
+                "SHOW INDEX FROM mod_autoaccept_logs WHERE Key_name = 'aao_order_trigger_unique'"
+            );
+            if (empty($existing)) {
+                Capsule::statement(
+                    'ALTER TABLE mod_autoaccept_logs ADD UNIQUE KEY aao_order_trigger_unique (order_id, trigger_hook)'
+                );
+            }
         }
 
         return [
@@ -65,23 +79,56 @@ function auto_accept_orders_activate()
 }
 
 /**
- * Deactivate module and drop logs table.
+ * Deactivate module.
+ *
+ * The mod_autoaccept_logs table is intentionally preserved so the audit trail
+ * is not lost when the module is toggled off and on.
  *
  * @return array
  */
 function auto_accept_orders_deactivate()
 {
+    return [
+        'status' => 'success',
+        'description' => 'Auto Accept Orders module deactivated. The mod_autoaccept_logs table has been preserved for audit purposes.',
+    ];
+}
+
+/**
+ * Upgrade module schema.
+ *
+ * Runs when an operator clicks Upgrade in Setup > Addon Modules.
+ * Each migration block is gated on the version being upgraded from so
+ * upgrades are idempotent even if run multiple times.
+ *
+ * @param array $vars Contains 'version' — the currently installed version.
+ *
+ * @return array
+ */
+function auto_accept_orders_upgrade($vars)
+{
+    $version = isset($vars['version']) ? (string) $vars['version'] : '0.0.0';
+
     try {
-        Capsule::schema()->dropIfExists('mod_autoaccept_logs');
+        if (version_compare($version, '1.1.0', '<') && Capsule::schema()->hasTable('mod_autoaccept_logs')) {
+            $existing = Capsule::select(
+                "SHOW INDEX FROM mod_autoaccept_logs WHERE Key_name = 'aao_order_trigger_unique'"
+            );
+            if (empty($existing)) {
+                Capsule::statement(
+                    'ALTER TABLE mod_autoaccept_logs ADD UNIQUE KEY aao_order_trigger_unique (order_id, trigger_hook)'
+                );
+            }
+        }
 
         return [
             'status' => 'success',
-            'description' => 'Auto Accept Orders module deactivated successfully.',
+            'description' => 'Auto Accept Orders upgraded successfully.',
         ];
     } catch (\Throwable $e) {
         return [
             'status' => 'error',
-            'description' => 'Deactivation failed: ' . $e->getMessage(),
+            'description' => 'Upgrade failed: ' . $e->getMessage(),
         ];
     }
 }
