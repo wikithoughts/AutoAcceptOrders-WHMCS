@@ -1,0 +1,166 @@
+<?php
+/** @var array $logs */
+/** @var \AutoAcceptOrders\Admin\LogQuery $query */
+/** @var int $total */
+/** @var string $csrf */
+/** @var string $baseLink */
+
+$totalPages = $total > 0 ? (int) ceil($total / $query->perPage) : 1;
+$e = function (string $val): string {
+    return htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+};
+$statusBadge = function (string $response): string {
+    if ($response === 'PENDING') {
+        return '<span class="aao-badge aao-pending">PENDING</span>';
+    }
+    if (strpos($response, '"result":"success"') !== false) {
+        return '<span class="aao-badge aao-ok">OK</span>';
+    }
+    return '<span class="aao-badge aao-error">ERROR</span>';
+};
+?>
+<style>
+    .aao-wrap{max-width:1200px;margin:24px 0;padding:0;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+    .aao-title{font-size:22px;line-height:1.4;font-weight:600;margin:0 0 8px;}
+    .aao-sub{font-size:14px;line-height:1.6;color:#2c2c2c;margin:0 0 18px;}
+    .aao-filter{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:0 0 18px;padding:14px 16px;background:#f9f6f1;border:1px solid #d7d7d7;}
+    .aao-filter label{font-size:12px;font-weight:600;color:#444;display:flex;flex-direction:column;gap:4px;}
+    .aao-filter input,.aao-filter select{padding:6px 8px;border:1px solid #bbb;font-size:13px;background:#fff;}
+    .aao-filter button{padding:7px 16px;background:#c6b797;border:1px solid #b0a080;font-size:13px;font-weight:600;cursor:pointer;}
+    .aao-filter button.aao-reset{background:#fff;border-color:#ccc;font-weight:400;}
+    .aao-table{width:100%;border-collapse:collapse;background:#fff;}
+    .aao-table th,.aao-table td{border:1px solid #d7d7d7;padding:10px 12px;vertical-align:top;text-align:left;font-size:13px;line-height:1.5;}
+    .aao-table th{background:#c6b797;color:#111;font-weight:600;}
+    .aao-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto;display:block;}
+    .aao-empty{padding:14px;border:1px solid #d7d7d7;background:#fff;font-size:13px;}
+    .aao-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.04em;}
+    .aao-pending{background:#fff3cd;color:#856404;}
+    .aao-ok{background:#d1e7dd;color:#0a3622;}
+    .aao-error{background:#f8d7da;color:#58151c;}
+    .aao-pager{display:flex;align-items:center;gap:6px;margin:14px 0;font-size:13px;}
+    .aao-pager a{padding:4px 10px;border:1px solid #bbb;background:#fff;text-decoration:none;color:#111;}
+    .aao-pager a:hover{background:#f0ece4;}
+    .aao-pager .aao-cur{padding:4px 10px;border:1px solid #c6b797;background:#c6b797;font-weight:700;}
+    .aao-pager-info{margin-left:auto;color:#666;}
+    .aao-reprocess-btn{padding:4px 10px;background:#fff;border:1px solid #b0a080;font-size:12px;cursor:pointer;}
+    .aao-reprocess-btn:hover{background:#f0ece4;}
+</style>
+
+<div class="aao-wrap">
+    <h2 class="aao-title">Auto Accept Orders</h2>
+    <p class="aao-sub">Showing <?= $e((string) $total) ?> record(s).</p>
+
+    <form class="aao-filter" method="get" action="">
+        <label>Trigger
+            <select name="trigger">
+                <option value="">All</option>
+                <option value="InvoicePaid"<?= $query->trigger === 'InvoicePaid' ? ' selected' : '' ?>>InvoicePaid</option>
+                <option value="FreeOrder"<?= $query->trigger === 'FreeOrder' ? ' selected' : '' ?>>FreeOrder</option>
+            </select>
+        </label>
+        <label>Status
+            <select name="status">
+                <option value="">All</option>
+                <option value="PENDING"<?= $query->status === 'PENDING' ? ' selected' : '' ?>>Pending</option>
+                <option value="OK"<?= $query->status === 'OK' ? ' selected' : '' ?>>OK</option>
+                <option value="ERROR"<?= $query->status === 'ERROR' ? ' selected' : '' ?>>Error</option>
+            </select>
+        </label>
+        <label>Order ID
+            <input type="number" name="order_id" value="<?= $e((string) ($query->orderId ?? '')) ?>" min="1" style="width:90px;">
+        </label>
+        <label>Per page
+            <select name="per_page">
+                <?php foreach (\AutoAcceptOrders\Admin\LogQuery::PER_PAGE_OPTIONS as $opt): ?>
+                    <option value="<?= $e((string) $opt) ?>"<?= $query->perPage === $opt ? ' selected' : '' ?>><?= $e((string) $opt) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <input type="hidden" name="page" value="1">
+        <button type="submit">Filter</button>
+        <a href="<?= $e($baseLink) ?>" class="aao-filter"><button type="button" class="aao-reset">Reset</button></a>
+    </form>
+
+    <?php if (count($logs) === 0): ?>
+        <div class="aao-empty">No log records found matching the current filters.</div>
+    <?php else: ?>
+        <table class="aao-table">
+            <thead><tr>
+                <th>ID</th>
+                <th>Order ID</th>
+                <th>Trigger</th>
+                <th>Status</th>
+                <th>Client ID</th>
+                <th>Order Amount</th>
+                <th>Response</th>
+                <th>Created At</th>
+                <th>Action</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($logs as $log): ?>
+                <?php
+                $clientId    = isset($log->client_id)    ? (string) $log->client_id    : 'N/A';
+                $orderAmount = isset($log->order_amount)  ? (string) $log->order_amount  : 'N/A';
+                $response    = (string) ($log->status_response ?? '');
+                $isPending   = $response === 'PENDING';
+                ?>
+                <tr>
+                    <td><?= $e((string) ($log->id ?? '')) ?></td>
+                    <td><?= $e((string) ($log->order_id ?? '')) ?></td>
+                    <td><?= $e((string) ($log->trigger_hook ?? '')) ?></td>
+                    <td><?= $statusBadge($response) ?></td>
+                    <td><?= $e($clientId) ?></td>
+                    <td><?= $e($orderAmount) ?></td>
+                    <td><span class="aao-mono"><?= $e($response) ?></span></td>
+                    <td><?= $e((string) ($log->created_at ?? '')) ?></td>
+                    <td>
+                        <?php if ($isPending): ?>
+                            <form method="post" action="" style="margin:0;">
+                                <input type="hidden" name="aao_action" value="reprocess">
+                                <input type="hidden" name="id" value="<?= $e((string) ($log->id ?? '')) ?>">
+                                <input type="hidden" name="token" value="<?= $e($csrf) ?>">
+                                <?php
+                                foreach (['page', 'per_page', 'trigger', 'status', 'order_id'] as $fkey) {
+                                    if (isset($_GET[$fkey]) && $_GET[$fkey] !== '') {
+                                        echo '<input type="hidden" name="' . $e($fkey) . '" value="' . $e((string) $_GET[$fkey]) . '">';
+                                    }
+                                }
+                                ?>
+                                <button type="submit" class="aao-reprocess-btn">Reprocess</button>
+                            </form>
+                        <?php else: ?>
+                            &mdash;
+                        <?php endif; ?>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <div class="aao-pager">
+            <?php if ($query->page > 1): ?>
+                <a href="<?= $e($baseLink . '&' . $query->toQueryString(['page' => $query->page - 1])) ?>">&laquo; Prev</a>
+            <?php endif; ?>
+
+            <?php
+            $window = 5;
+            $start  = max(1, $query->page - (int) floor($window / 2));
+            $end    = min($totalPages, $start + $window - 1);
+            $start  = max(1, $end - $window + 1);
+            for ($p = $start; $p <= $end; $p++):
+            ?>
+                <?php if ($p === $query->page): ?>
+                    <span class="aao-cur"><?= $e((string) $p) ?></span>
+                <?php else: ?>
+                    <a href="<?= $e($baseLink . '&' . $query->toQueryString(['page' => $p])) ?>"><?= $e((string) $p) ?></a>
+                <?php endif; ?>
+            <?php endfor; ?>
+
+            <?php if ($query->page < $totalPages): ?>
+                <a href="<?= $e($baseLink . '&' . $query->toQueryString(['page' => $query->page + 1])) ?>">Next &raquo;</a>
+            <?php endif; ?>
+
+            <span class="aao-pager-info">Page <?= $e((string) $query->page) ?> of <?= $e((string) $totalPages) ?> &mdash; <?= $e((string) $total) ?> total</span>
+        </div>
+    <?php endif; ?>
+</div>
