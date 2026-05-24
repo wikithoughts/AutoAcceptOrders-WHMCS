@@ -1,0 +1,14 @@
+parameters:
+  level: 5
+  paths:
+    - modules/addons/auto_accept_orders/lib
+    - modules/addons/auto_accept_orders/auto_accept_orders.php
+    - modules/addons/auto_accept_orders/hooks.php
+  excludePaths:
+    - tests/Stub
+  ignoreErrors:
+    # WHMCS classes are not available in dev/CI; these are safe to ignore.
+    - '#(Call to static method|Access to (static property|constant)) .+ on an unknown class WHMCS\\#'
+    # WHMCS global functions are also unavailable outside a real WHMCS install.
+    - '#Function (localAPI|logModuleCall|add_hook) not found\.#'
+  treatPhpDocTypesAsCertain: false

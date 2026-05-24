@@ -17,6 +17,10 @@ logs/
 # PHP / Composer
 /vendor/
 composer.phar
+/.phpunit.result.cache
+/.php-cs-fixer.cache
+/.phpstan/
+/build/
 
 # WHMCS runtime caches (safe to regenerate)
 templates_c/*
