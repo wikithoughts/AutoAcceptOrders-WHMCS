@@ -1,0 +1,22 @@
+# .orchestration/lanes.yml — AutoAcceptOrders-WHMCS
+# PHP WHMCS module. verify matches composer.json's real scripts exactly.
+# NOTE: `feat/v1.2.0-overhaul` and `fix/review-hardening-v1.1.0` back OPEN PRs against the
+# upstream fork source (VercaaLLC/AutoAcceptOrders-WHMCS #1, #2) — a lane must never be
+# assigned to touch or force-push those two branches; they belong to the upstream PR flow,
+# not this harness.
+verify: "composer test && composer stan"
+
+hot_files: []
+counters: {}
+singleton_paths: []
+deploy_on_merge: []   # deployed manually to hosting, not via CI
+
+setup:
+  run: null
+  copy_env: []
+  ports: {}
+
+required_checks: [ci]
+merge: squash
+force_push: allowed
+serialized_ci: []
