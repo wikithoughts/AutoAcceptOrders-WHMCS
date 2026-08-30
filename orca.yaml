@@ -1,0 +1,9 @@
+scripts:
+  setup: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "== composer install =="
+    composer install --no-progress --prefer-dist --no-interaction
+
+    echo "Worktree setup complete."
