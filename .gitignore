@@ -30,3 +30,6 @@ templates_c/*
 # Temporary files
 *.tmp
 *.swp
+
+# Orca
+.orca/
